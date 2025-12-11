@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -9,16 +9,19 @@ use crate::{
     },
     kernel::fs::{
         FileSystem,
+        alloc_map::AllocMap,
         node::{NODE_SIZE, NODES_PER_BLOCK, Node},
     },
 };
 
-/// Represents a filesystem operation that buffers changes in memory before commiting them to
-/// persistent storage.
+/// A cache to buffer changes.
+type Changes = BTreeMap<usize, Block>;
+
+/// A filesystem operation that buffers changes in memory before commiting them to persistent storage.
 pub struct Transaction<'a> {
     fs: &'a mut FileSystem,
     storage: &'a mut Storage,
-    changes: HashMap<usize, Block>,
+    changes: Changes,
 }
 
 impl<'a> Transaction<'a> {
@@ -27,12 +30,13 @@ impl<'a> Transaction<'a> {
         Self {
             fs,
             storage,
-            changes: HashMap::new(),
+            changes: Changes::new(),
         }
     }
 
     /// Commits the transaction to persistent storage, consuming the transaction.
-    pub fn commit(self) {
+    pub fn commit(mut self) {
+        self.sync_maps();
         for (&block_index, block) in self.changes.iter() {
             self.storage
                 .write_block(block_index, block)
@@ -40,7 +44,28 @@ impl<'a> Transaction<'a> {
         }
     }
 
-    /// Reads the node at a given node index from the node table.
+    /// Queues a synchronization of allocation maps.
+    fn sync_maps(&mut self) {
+        let fs = &self.fs;
+        let changes = &mut self.changes;
+        Self::buffer_write_map(changes, &fs.block_map, fs.superblock.block_map_offset);
+        Self::buffer_write_map(changes, &fs.node_map, fs.superblock.node_map_offset);
+    }
+
+    /// Buffers a write to the allocation map.
+    fn buffer_write_map(changes: &mut Changes, map: &AllocMap, map_offset: usize) {
+        let bytes = map.as_slice().as_bytes();
+        for (i, chunk) in bytes.chunks(BLOCK_SIZE).enumerate() {
+            let block = Block::read_from_bytes(chunk).unwrap_or_else(|_| {
+                let mut block = Block::new();
+                block.data[..chunk.len()].copy_from_slice(chunk);
+                block
+            });
+            Self::buffer_write_block(changes, map_offset + i, &block);
+        }
+    }
+
+    /// Reads the node from the node table.
     pub fn read_node(&self, node_index: usize) -> Result<Node, Error> {
         let block_index = self
             .get_node_block_index(node_index)
@@ -55,7 +80,7 @@ impl<'a> Transaction<'a> {
         )
     }
 
-    // Writes the node at a given node index to the node table.
+    // Queues a write of the node to the node table.
     pub fn write_node(&mut self, node_index: usize, node: Node) -> Result<(), Error> {
         let block_index = self
             .get_node_block_index(node_index)
@@ -69,7 +94,7 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
-    /// Reads the physical block at a given block index.
+    /// Reads the physical block.
     pub fn read_block(&self, block_index: usize) -> Result<Block, Error> {
         // Check cached changes
         match self.changes.get(&block_index) {
@@ -81,9 +106,14 @@ impl<'a> Transaction<'a> {
         }
     }
 
-    /// Writes the physical block at a given block index.
+    /// Buffers a write to the physical block.
+    fn buffer_write_block(changes: &mut Changes, block_index: usize, block: &Block) {
+        changes.insert(block_index, *block);
+    }
+
+    /// Queues a write of the physical block.
     pub fn write_block(&mut self, block_index: usize, block: &Block) {
-        self.changes.insert(block_index, *block);
+        Self::buffer_write_block(&mut self.changes, block_index, block);
     }
 
     /// Reads the logical block that belongs to the node.
@@ -94,7 +124,7 @@ impl<'a> Transaction<'a> {
         self.read_block(block_index)
     }
 
-    /// Writes the logical block that belongs to the node.
+    /// Queues a write of the logical block that belongs to the node.
     pub fn write_logical_block(
         &mut self,
         node: Node,
