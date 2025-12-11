@@ -206,6 +206,7 @@ impl<'a> Transaction<'a> {
 
         if size >= node.size {
             node.size = size;
+            self.write_node(node_index, node)?;
             return Ok(());
         }
 
