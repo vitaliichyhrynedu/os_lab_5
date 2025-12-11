@@ -10,8 +10,8 @@ use crate::{
     kernel::fs::{
         FileSystem,
         alloc_map::{self, AllocMap},
-        directory::{self, Directory, DirectoryEntry, FileType, Name},
-        node::{self, NODE_SIZE, NODES_PER_BLOCK, Node},
+        directory::{self, Directory, DirectoryEntry, Name},
+        node::{self, FileType, NODE_SIZE, NODES_PER_BLOCK, Node},
     },
 };
 
@@ -76,8 +76,8 @@ impl<'a> Transaction<'a> {
             .get_node_byte_offset(node_index)
             .ok_or(Error::NodeIndexOutOfBounds)?;
         Ok(
-            Node::read_from_bytes(&block.data[byte_offset..(byte_offset + NODE_SIZE)])
-                .expect("'bytes' must have length 'NODE_SIZE'"),
+            Node::try_read_from_bytes(&block.data[byte_offset..(byte_offset + NODE_SIZE)])
+                .expect("'bytes' must be a valid 'Node'"),
         )
     }
 
@@ -96,8 +96,8 @@ impl<'a> Transaction<'a> {
     }
 
     /// Allocates a [Node], returning it and its index.
-    pub fn create_node(&mut self) -> Result<(Node, usize), Error> {
-        let node = Node::default();
+    pub fn create_node(&mut self, filetype: FileType) -> Result<(Node, usize), Error> {
+        let node = Node::new(filetype);
         let (node_index, _) = self.fs.node_map.allocate(1).map_err(|e| Error::Alloc(e))?;
         self.write_node(node_index, node)?;
         Ok((node, node_index))
@@ -200,7 +200,7 @@ impl<'a> Transaction<'a> {
     ) -> Result<usize, Error> {
         let name = Name::new(name).map_err(|e| Error::Dir(e))?;
 
-        let (mut node, node_index) = self.create_node()?;
+        let (mut node, node_index) = self.create_node(FileType::File)?;
         node.link_count += 1;
 
         let entry = DirectoryEntry::new(node_index, filetype, name);

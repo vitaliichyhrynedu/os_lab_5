@@ -5,6 +5,7 @@ use crate::{
     kernel::fs::{
         alloc_map::{AllocFlag, AllocMap},
         directory::Directory,
+        node::FileType,
         superblock::Superblock,
         transaction::Transaction,
     },
@@ -60,7 +61,7 @@ impl FileSystem {
         {
             let mut tx = Transaction::new(&mut fs, storage);
             let (_, root_index) = tx
-                .create_node()
+                .create_node(FileType::Directory)
                 .expect("Must be able to create the root node");
             assert!(root_index == ROOT_INDEX);
             let root = Directory::new(root_index, root_index);

@@ -1,4 +1,4 @@
-use zerocopy::{FromBytes, Immutable, IntoBytes};
+use zerocopy::{FromBytes, Immutable, IntoBytes, TryFromBytes};
 
 use crate::hardware::storage::block::BLOCK_SIZE;
 
@@ -14,14 +14,27 @@ const EXTENTS_PER_NODE: usize = 15;
 /// Represents a file system object.
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
-#[derive(FromBytes, IntoBytes, Immutable)]
+#[derive(TryFromBytes, IntoBytes, Immutable)]
 pub struct Node {
     pub size: usize,
-    pub link_count: u64,
-    pub extents: [Extent; EXTENTS_PER_NODE],
+    pub link_count: u32,
+    filetype: FileType,
+    _pad: [u8; 3],
+    extents: [Extent; EXTENTS_PER_NODE],
 }
 
 impl Node {
+    pub fn new(filetype: FileType) -> Self {
+        Self {
+            filetype,
+            ..Default::default()
+        }
+    }
+
+    pub fn filetype(&self) -> FileType {
+        self.filetype
+    }
+
     /// Resolves the logical block index into a physical block index.
     pub fn get_physical_block(&self, logical_block: usize) -> Option<usize> {
         let mut offset = logical_block;
@@ -75,6 +88,16 @@ impl Node {
         }
         Err(Error::OutOfExtents)
     }
+}
+
+/// Represents file types.
+#[repr(u8)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(TryFromBytes, IntoBytes, Immutable)]
+pub enum FileType {
+    #[default]
+    File,
+    Directory,
 }
 
 /// Represents a contiguous span of physical blocks.

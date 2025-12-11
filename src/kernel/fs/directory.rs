@@ -1,5 +1,7 @@
 use zerocopy::{FromBytes, Immutable, IntoBytes, TryFromBytes};
 
+use crate::kernel::fs::node::FileType;
+
 /// Tracks entries within a directory.
 pub struct Directory {
     entries: Vec<DirectoryEntry>,
@@ -101,6 +103,10 @@ impl DirectoryEntry {
     pub fn is_null(&self) -> bool {
         self.index == 0
     }
+
+    pub fn filetype(&self) -> FileType {
+        self.filetype
+    }
 }
 
 /// How long a directory entry name can be.
@@ -135,15 +141,6 @@ impl Name {
             .unwrap_or(MAX_NAME_LEN);
         str::from_utf8(&self.bytes[..len]).expect("'bytes' must contain a valid UTF-8 string")
     }
-}
-
-/// Represents file types.
-#[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-#[derive(TryFromBytes, IntoBytes, Immutable)]
-pub enum FileType {
-    File,
-    Directory,
 }
 
 #[derive(Debug)]
