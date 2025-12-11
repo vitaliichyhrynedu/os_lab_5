@@ -329,11 +329,17 @@ impl<'a> Transaction<'a> {
         node.link_count -= 1;
         if node.link_count == 0 {
             // Deallocate the file
-            for extent in node.get_extents() {
+            let extents = node
+                .get_mut_extents()
+                .iter_mut()
+                .take_while(|e| !e.is_null());
+            for extent in extents {
                 self.fs
                     .block_map
                     .free(extent.span())
                     .map_err(|e| Error::Alloc(e))?;
+                extent.start = 0;
+                extent.end = 0;
             }
             self.fs
                 .node_map
