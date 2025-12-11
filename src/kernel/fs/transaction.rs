@@ -196,6 +196,52 @@ impl<'a> Transaction<'a> {
         Ok(bytes_written)
     }
 
+    /// Truncates the file to specified size.
+    pub fn truncate_file(&mut self, node_index: usize, size: usize) -> Result<(), Error> {
+        let mut node = self.read_node(node_index)?;
+
+        if node.filetype() != FileType::File {
+            return Err(Error::FileTypeNotTruncateable);
+        }
+
+        if size >= node.size {
+            node.size = size;
+            return Ok(());
+        }
+
+        let blocks_needed = size.div_ceil(BLOCK_SIZE);
+        let mut blocks_passed = 0;
+        for extent in node.get_mut_extents() {
+            if extent.is_null() {
+                break;
+            }
+            let extent_len = extent.block_count();
+            if blocks_passed >= blocks_needed {
+                // Extent is entirely beyond the size
+                self.fs
+                    .block_map
+                    .free(extent.span())
+                    .map_err(|e| Error::Alloc(e))?;
+                extent.start = 0;
+                extent.end = 0;
+            } else if blocks_passed + extent_len >= blocks_needed {
+                // Extent is partially needed
+                let blocks_keep = blocks_needed - blocks_passed;
+                let new_end = extent.start + blocks_keep;
+                self.fs
+                    .block_map
+                    .free((new_end, extent.end))
+                    .map_err(|e| Error::Alloc(e))?;
+                extent.end = new_end;
+            }
+            blocks_passed += extent_len;
+        }
+
+        node.size = size;
+        self.write_node(node_index, node)?;
+        return Ok(());
+    }
+
     /// Creates a file with the given name and type inside the specified parent directory, returning its node index.
     pub fn create_file(
         &mut self,
@@ -283,7 +329,7 @@ impl<'a> Transaction<'a> {
         node.link_count -= 1;
         if node.link_count == 0 {
             // Deallocate the file
-            for extent in node.extents() {
+            for extent in node.get_extents() {
                 self.fs
                     .block_map
                     .free(extent.span())
@@ -351,4 +397,5 @@ pub enum Error {
     Node(node::Error),
     FileNotFound,
     FileTypeNotLinkable,
+    FileTypeNotTruncateable,
 }

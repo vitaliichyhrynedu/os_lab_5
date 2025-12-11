@@ -37,9 +37,14 @@ impl Node {
         self.filetype
     }
 
-    /// Returns the extents of the node as a slice.
-    pub fn extents(&self) -> &[Extent] {
+    /// Returns a reference to node's extents.
+    pub fn get_extents(&self) -> &[Extent] {
         &self.extents
+    }
+
+    /// Returns a mutable reference to node's extents.
+    pub fn get_mut_extents(&mut self) -> &mut [Extent] {
+        &mut self.extents
     }
 
     /// Resolves the logical block index into a physical block index.
@@ -112,8 +117,8 @@ pub enum FileType {
 #[derive(Default, Clone, Copy)]
 #[derive(FromBytes, IntoBytes, Immutable)]
 pub struct Extent {
-    start: usize,
-    end: usize,
+    pub start: usize,
+    pub end: usize,
 }
 
 impl Extent {
