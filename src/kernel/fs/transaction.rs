@@ -273,6 +273,7 @@ impl<'a> Transaction<'a> {
     }
 }
 
+#[derive(Debug)]
 pub enum Error {
     BlockIndexOutOfBounds,
     NodeIndexOutOfBounds,

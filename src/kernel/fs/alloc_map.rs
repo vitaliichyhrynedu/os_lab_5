@@ -109,6 +109,7 @@ pub enum AllocFlag {
 }
 
 /// [AllocMap]-related errors.
+#[derive(Debug)]
 pub enum Error {
     IndexOutOfBounds,
     ObjectOccupied,
