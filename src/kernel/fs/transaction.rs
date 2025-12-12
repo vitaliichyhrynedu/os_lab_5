@@ -48,21 +48,39 @@ impl<'a> Transaction<'a> {
     /// Queues a synchronization of allocation maps.
     fn sync_maps(&mut self) {
         let fs = &self.fs;
+        let storage = &self.storage;
         let changes = &mut self.changes;
-        Self::buffer_write_map(changes, &fs.block_map, fs.superblock.block_map_offset);
-        Self::buffer_write_map(changes, &fs.node_map, fs.superblock.node_map_offset);
+        Self::_sync_map(
+            storage,
+            changes,
+            &fs.block_map,
+            fs.superblock.block_map_offset,
+        );
+        Self::_sync_map(
+            storage,
+            changes,
+            &fs.node_map,
+            fs.superblock.node_map_offset,
+        );
     }
 
-    /// Buffers a write to the allocation map.
-    fn buffer_write_map(changes: &mut Changes, map: &AllocMap, map_offset: usize) {
+    // Internal implementation of 'sync_maps' for a single map.
+    // Separated to split borrows.
+    fn _sync_map(storage: &Storage, changes: &mut Changes, map: &AllocMap, map_offset: usize) {
         let bytes = map.as_slice().as_bytes();
         for (i, chunk) in bytes.chunks(BLOCK_SIZE).enumerate() {
-            let block = Block::read_from_bytes(chunk).unwrap_or_else(|_| {
+            let block_mem = Block::read_from_bytes(chunk).unwrap_or_else(|_| {
                 let mut block = Block::new();
                 block.data[..chunk.len()].copy_from_slice(chunk);
                 block
             });
-            Self::buffer_write_block(changes, map_offset + i, &block);
+            // Check if in-memory and stored blocks differ
+            let block_index = map_offset + i;
+            let block_stored = Self::_read_block(storage, changes, block_index)
+                .expect("Must be able to read the allocation map");
+            if !(block_mem.data == block_stored.data) {
+                Self::_write_block(changes, map_offset + i, &block_mem);
+            }
         }
     }
 
@@ -351,26 +369,36 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
-    /// Reads the physical block.
-    pub fn read_block(&self, block_index: usize) -> Result<Block, Error> {
+    // Internal implementation of 'read_block'.
+    // Separated to split borrows in some contexts.
+    fn _read_block(
+        storage: &Storage,
+        changes: &Changes,
+        block_index: usize,
+    ) -> Result<Block, Error> {
         // Check cached changes
-        match self.changes.get(&block_index) {
+        match changes.get(&block_index) {
             Some(block) => Ok(*block),
-            None => self
-                .storage
+            None => storage
                 .read_block(block_index)
                 .map_err(|_| Error::BlockIndexOutOfBounds),
         }
     }
 
-    /// Buffers a write to the physical block.
-    fn buffer_write_block(changes: &mut Changes, block_index: usize, block: &Block) {
+    /// Reads the physical block.
+    pub fn read_block(&self, block_index: usize) -> Result<Block, Error> {
+        Self::_read_block(&self.storage, &self.changes, block_index)
+    }
+
+    // Internal implementation of 'write_block'.
+    // Separated to split borrows in some contexts.
+    fn _write_block(changes: &mut Changes, block_index: usize, block: &Block) {
         changes.insert(block_index, *block);
     }
 
     /// Queues a write of the physical block.
     pub fn write_block(&mut self, block_index: usize, block: &Block) {
-        Self::buffer_write_block(&mut self.changes, block_index, block);
+        Self::_write_block(&mut self.changes, block_index, block);
     }
 
     /// Returns the index of the block in which the node resides.
