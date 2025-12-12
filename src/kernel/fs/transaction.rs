@@ -10,7 +10,7 @@ use crate::{
     kernel::fs::{
         FileSystem,
         alloc_map::{self, AllocMap},
-        directory::{self, Directory, DirectoryEntry, Name},
+        directory::{self, Dir, DirEntry, DirEntryName},
         node::{self, FileType, NODE_SIZE, NODES_PER_BLOCK, Node},
     },
 };
@@ -257,12 +257,12 @@ impl<'a> Transaction<'a> {
         name: &str,
         filetype: FileType,
     ) -> Result<usize> {
-        let name = Name::new(name).map_err(Error::Dir)?;
+        let name = DirEntryName::new(name).map_err(Error::Dir)?;
 
         let (mut node, node_index) = self.create_node(FileType::File)?;
         node.link_count += 1;
 
-        let entry = DirectoryEntry::new(node_index, filetype, name);
+        let entry = DirEntry::new(node_index, filetype, name);
         let mut parent = self.read_directory(parent_index)?;
         parent.add_entry(entry);
 
@@ -273,17 +273,17 @@ impl<'a> Transaction<'a> {
     }
 
     /// Reads the directory.
-    pub fn read_directory(&self, node_index: usize) -> Result<Directory> {
+    pub fn read_directory(&self, node_index: usize) -> Result<Dir> {
         let node = self.read_node(node_index)?;
         let mut buf = vec![0u8; node.size];
         self.read_file_at(node_index, 0, &mut buf)?;
-        let dir_ents = <[DirectoryEntry]>::try_ref_from_bytes(&buf)
-            .expect("'buf' must contain a valid '[DirectoryEntry]'");
-        Ok(Directory::from_slice(dir_ents))
+        let dir_ents = <[DirEntry]>::try_ref_from_bytes(&buf)
+            .expect("'buf' must contain a valid '[DirEntry]'");
+        Ok(Dir::from_slice(dir_ents))
     }
 
     /// Writes the directory.
-    pub fn write_directory(&mut self, node_index: usize, dir: &Directory) -> Result<()> {
+    pub fn write_directory(&mut self, node_index: usize, dir: &Dir) -> Result<()> {
         let bytes = dir.as_slice().as_bytes();
         self.write_file_at(node_index, 0, bytes)?;
         Ok(())
@@ -291,15 +291,15 @@ impl<'a> Transaction<'a> {
 
     /// Creates a directory with the given name inside the specified parent directory, returning its node index.
     pub fn create_directory(&mut self, parent_index: usize, name: &str) -> Result<usize> {
-        let node_index = self.create_file(parent_index, name, FileType::Directory)?;
-        let dir = Directory::new(node_index, parent_index);
+        let node_index = self.create_file(parent_index, name, FileType::Dir)?;
+        let dir = Dir::new(node_index, parent_index);
         self.write_directory(node_index, &dir)?;
         Ok(node_index)
     }
 
     /// Creates a hard link to the file with a given name.
     pub fn link_file(&mut self, parent_index: usize, node_index: usize, name: &str) -> Result<()> {
-        let name = Name::new(name).map_err(Error::Dir)?;
+        let name = DirEntryName::new(name).map_err(Error::Dir)?;
 
         let mut node = self.read_node(node_index)?;
         if node.filetype() != FileType::File {
@@ -309,7 +309,7 @@ impl<'a> Transaction<'a> {
         self.write_node(node_index, node)?;
 
         let mut dir = self.read_directory(parent_index)?;
-        let entry = DirectoryEntry::new(node_index, node.filetype(), name);
+        let entry = DirEntry::new(node_index, node.filetype(), name);
         dir.add_entry(entry);
         self.write_directory(parent_index, &dir)?;
 
@@ -318,7 +318,7 @@ impl<'a> Transaction<'a> {
 
     /// Removes a hard link to the file with a given name.
     pub fn unlink_file(&mut self, parent_index: usize, name: &str) -> Result<()> {
-        let name = Name::new(name).map_err(Error::Dir)?;
+        let name = DirEntryName::new(name).map_err(Error::Dir)?;
 
         let mut dir = self.read_directory(parent_index)?;
         let entry = dir.get_entry(name).ok_or(Error::FileNotFound)?;

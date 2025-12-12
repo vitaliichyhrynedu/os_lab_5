@@ -182,7 +182,7 @@ impl Node {
 pub enum FileType {
     #[default]
     File,
-    Directory,
+    Dir,
 }
 
 /// Represents a contiguous span of physical blocks.

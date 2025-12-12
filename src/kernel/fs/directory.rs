@@ -3,35 +3,35 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, TryFromBytes};
 use crate::kernel::fs::node::FileType;
 
 /// Tracks entries within a directory.
-pub struct Directory {
-    entries: Vec<DirectoryEntry>,
+pub struct Dir {
+    entries: Vec<DirEntry>,
 }
 
-impl Directory {
-    /// Constructs an empty [Directory] with given node index and parent node index.
+impl Dir {
+    /// Constructs an empty [Dir] with given node index and parent node index.
     pub fn new(index: usize, parent_index: usize) -> Self {
         let mut dir = Self {
             entries: Vec::new(),
         };
-        dir.add_entry(DirectoryEntry::itself(index));
-        dir.add_entry(DirectoryEntry::parent(parent_index));
+        dir.add_entry(DirEntry::itself(index));
+        dir.add_entry(DirEntry::parent(parent_index));
         dir
     }
 
     /// Returns a reference to an entry with a given name.
-    pub fn get_entry(&self, name: Name) -> Option<&DirectoryEntry> {
+    pub fn get_entry(&self, name: DirEntryName) -> Option<&DirEntry> {
         self.entries.iter().find(|e| e.name == name && !e.is_null())
     }
 
     /// Returns a mutable reference to an entry with a given name.
-    pub fn get_mut_entry(&mut self, name: Name) -> Option<&mut DirectoryEntry> {
+    pub fn get_mut_entry(&mut self, name: DirEntryName) -> Option<&mut DirEntry> {
         self.entries
             .iter_mut()
             .find(|e| e.name == name && !e.is_null())
     }
 
     /// Adds an entry to the directory.
-    pub fn add_entry(&mut self, entry: DirectoryEntry) {
+    pub fn add_entry(&mut self, entry: DirEntry) {
         let vacancy = self.entries.iter_mut().find(|e| e.is_null());
         match vacancy {
             Some(v) => *v = entry,
@@ -40,40 +40,40 @@ impl Directory {
     }
 
     /// Removes the entry from the directory, returning its node index.
-    pub fn remove_entry(&mut self, name: Name) -> Result<usize> {
+    pub fn remove_entry(&mut self, name: DirEntryName) -> Result<usize> {
         let entry = self.get_mut_entry(name).ok_or(Error::EntryNotFound)?;
         let node_index = entry.index;
         entry.index = 0;
         Ok(node_index)
     }
 
-    /// Returns a view of the directory as a slice of [DirectoryEntry].
-    pub fn as_slice(&self) -> &[DirectoryEntry] {
+    /// Returns a view of the directory as a slice of [DirEntry].
+    pub fn as_slice(&self) -> &[DirEntry] {
         self.entries.as_slice()
     }
 
-    /// Constructs a [Directory] from a slice of [DirectoryEntry].
-    pub fn from_slice(entries: &[DirectoryEntry]) -> Self {
+    /// Constructs a [Dir] from a slice of [DirEntry].
+    pub fn from_slice(entries: &[DirEntry]) -> Self {
         Self {
             entries: entries.to_vec(),
         }
     }
 }
 
-/// Represents a [Directory] entry.
+/// Represents a [Dir] entry.
 #[repr(C)]
 #[derive(Clone, Copy)]
 #[derive(TryFromBytes, IntoBytes, Immutable)]
-pub struct DirectoryEntry {
+pub struct DirEntry {
     filetype: FileType,
     _pad: [u8; 7],
     index: usize,
-    name: Name,
+    name: DirEntryName,
 }
 
-impl DirectoryEntry {
+impl DirEntry {
     /// Constructs a directory entry with given parameters
-    pub fn new(index: usize, filetype: FileType, name: Name) -> Self {
+    pub fn new(index: usize, filetype: FileType, name: DirEntryName) -> Self {
         Self {
             index,
             _pad: [0u8; 7],
@@ -86,8 +86,8 @@ impl DirectoryEntry {
     pub fn itself(index: usize) -> Self {
         Self::new(
             index,
-            FileType::Directory,
-            Name::new(".").expect("'.' must be a valid directory entry name"),
+            FileType::Dir,
+            DirEntryName::new(".").expect("'.' must be a valid directory entry name"),
         )
     }
 
@@ -95,8 +95,8 @@ impl DirectoryEntry {
     pub fn parent(index: usize) -> Self {
         Self::new(
             index,
-            FileType::Directory,
-            Name::new("..").expect("'..' must be a valid directory entry name"),
+            FileType::Dir,
+            DirEntryName::new("..").expect("'..' must be a valid directory entry name"),
         )
     }
 
@@ -117,11 +117,11 @@ const MAX_NAME_LEN: usize = 64;
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[derive(FromBytes, IntoBytes, Immutable)]
-pub struct Name {
+pub struct DirEntryName {
     bytes: [u8; MAX_NAME_LEN],
 }
 
-impl Name {
+impl DirEntryName {
     /// Constructs a valid directory entry name from a string.
     pub fn new(string: &str) -> Result<Self> {
         let len = string.len();
