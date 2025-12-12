@@ -21,13 +21,13 @@ pub mod transaction;
 pub const ROOT_INDEX: usize = 1;
 
 /// An in-memory view of the filesystem.
-pub struct FileSystem {
+pub struct Filesystem {
     superblock: Superblock,
     block_map: AllocMap,
     node_map: AllocMap,
 }
 
-impl FileSystem {
+impl Filesystem {
     /// Formats the persistent storage with a filesystem.
     ///
     /// # Panics
@@ -51,7 +51,7 @@ impl FileSystem {
             .expect("'0'th node must not be allocated");
 
         // Create filesystem
-        let mut fs = FileSystem {
+        let mut fs = Filesystem {
             superblock,
             block_map,
             node_map,

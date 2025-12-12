@@ -1,6 +1,6 @@
 use crate::{
     hardware::storage::Storage,
-    kernel::{file::OpenFileTable, fs::FileSystem},
+    kernel::{file::OpenFileTable, fs::Filesystem},
 };
 
 pub mod file;
@@ -10,7 +10,7 @@ pub mod syscall;
 /// A model for the kernel.
 pub struct Kernel {
     storage: Storage,
-    filesystem: Option<FileSystem>,
+    filesystem: Option<Filesystem>,
     open_files: OpenFileTable,
 }
 

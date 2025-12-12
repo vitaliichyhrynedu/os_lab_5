@@ -8,7 +8,7 @@ use crate::{
         block::{BLOCK_SIZE, Block},
     },
     kernel::fs::{
-        FileSystem, ROOT_INDEX,
+        Filesystem, ROOT_INDEX,
         alloc_map::{self, AllocMap},
         directory::{self, Dir, DirEntry, DirEntryName},
         node::{self, FileType, NODE_SIZE, NODES_PER_BLOCK, Node},
@@ -20,14 +20,14 @@ type Changes = BTreeMap<usize, Block>;
 
 /// A filesystem operation that buffers changes in memory before commiting them to persistent storage.
 pub struct Transaction<'a> {
-    fs: &'a mut FileSystem,
+    fs: &'a mut Filesystem,
     storage: &'a mut Storage,
     changes: Changes,
 }
 
 impl<'a> Transaction<'a> {
     /// Constructs a [Transaction] for the given filesystem and storage.
-    pub fn new(fs: &'a mut FileSystem, storage: &'a mut Storage) -> Self {
+    pub fn new(fs: &'a mut Filesystem, storage: &'a mut Storage) -> Self {
         Self {
             fs,
             storage,
