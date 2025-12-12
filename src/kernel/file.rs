@@ -3,18 +3,18 @@ use std::collections::BTreeMap;
 use crate::kernel::fs::node::{FileType, Node};
 
 /// Tracks opened files.
-pub type OpenFileTable = BTreeMap<FileDescriptorNumber, FileDescriptor>;
+pub type OpenFileTable = BTreeMap<FileDescriptor, FileDescription>;
 
 /// Used to index the open file table.
-pub type FileDescriptorNumber = usize;
+pub type FileDescriptor = usize;
 
 /// A unique handle to a file.
-pub struct FileDescriptor {
+pub struct FileDescription {
     node_index: usize,
     pub offset: usize,
 }
 
-impl FileDescriptor {
+impl FileDescription {
     /// Creates a new [FileDescriptor] for the file.
     pub fn new(node_index: usize) -> Self {
         Self {
