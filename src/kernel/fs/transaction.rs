@@ -151,6 +151,7 @@ impl<'a> Transaction<'a> {
         Ok(bytes_read)
     }
 
+    // NOTE: Doesn't allow to write past the end of the file yet.
     /// Writes a byte slice to the file starting from a given offset.
     /// Returns the number of byttes written.
     pub fn write_file_at(
