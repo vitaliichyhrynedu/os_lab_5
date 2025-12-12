@@ -75,12 +75,12 @@ impl Node {
         byte_offset / BLOCK_SIZE
     }
 
-    /// Returns the number of logical blocks that belong to the node.
+    /// Returns the number of physical blocks that belong to the node.
     pub fn block_count(&self) -> usize {
         self.extents
             .iter()
-            .filter(|e| !e.is_null())
-            .map(|e| e.end - e.start)
+            .filter(|e| !e.is_null() && !e.is_hole())
+            .map(|e| e.len())
             .sum()
     }
 
