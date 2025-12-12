@@ -1,5 +1,6 @@
 use crate::hardware::storage::Storage;
 
+pub mod file;
 pub mod fs;
 
 /// A model for the kernel.
