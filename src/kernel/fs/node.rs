@@ -101,6 +101,7 @@ impl Node {
                     if !is_hole && contiguous {
                         // Can merge with the previous extent
                         self.extents[prev].end += 1;
+                        return Ok(());
                     }
                 }
                 if offset == 0 {
