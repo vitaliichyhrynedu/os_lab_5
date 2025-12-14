@@ -2,7 +2,7 @@ use crate::kernel::{
     Kernel,
     file::{FileDescription, FileDescriptor, FileStats},
     fs::{
-        Filesystem,
+        Filesystem, ROOT_INDEX,
         directory::DirEntryName,
         node::FileType,
         transaction::{self, Transaction},
@@ -12,6 +12,10 @@ use crate::kernel::{
 impl Kernel {
     /// Creates a file at `path`, if it doesn't exist.
     pub fn create(&mut self, path: &str) -> Result<()> {
+        if path.ends_with('/') {
+            return Err(Error::IsDir);
+        }
+
         let fs = self.fs.as_mut().ok_or(Error::FilesystemNotMounted)?;
         let mut tx = Transaction::new(fs, &mut self.storage);
 
@@ -110,7 +114,6 @@ impl Kernel {
         let mut tx = Transaction::new(fs, &mut self.storage);
 
         let node_index = tx.find_node(old_path, self.curr_dir)?;
-        let node = tx.read_node(node_index)?;
 
         let (parent, name) = Self::split_path(new_path);
         let parent = tx.find_node(parent, self.curr_dir)?;
@@ -186,8 +189,15 @@ impl Kernel {
 
     /// Deletes the directory at `path`.
     pub fn rmdir(&mut self, path: &str) -> Result<()> {
+        let path = path.trim_end_matches('/');
+
         let fs = self.fs.as_mut().ok_or(Error::FilesystemNotMounted)?;
         let mut tx = Transaction::new(fs, &mut self.storage);
+
+        let node_index = tx.find_node(path, self.curr_dir)?;
+        if node_index == ROOT_INDEX {
+            return Err(Error::NotPermitted);
+        }
 
         let (parent, name) = Self::split_path(path);
         let parent = tx.find_node(parent, self.curr_dir)?;
@@ -297,6 +307,8 @@ pub enum Error {
     InvalidFileDescriptor,
     FileExists,
     NotDir,
+    NotPermitted,
+    IsDir,
 }
 
 impl From<transaction::Error> for Error {
