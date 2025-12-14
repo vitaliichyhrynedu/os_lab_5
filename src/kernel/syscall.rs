@@ -61,7 +61,7 @@ impl Kernel {
             let mut tx = Transaction::new(fs, &mut self.storage);
             let node = tx.read_node(desc.node_index())?;
             if node.link_count == 0 {
-                tx.delete_node(desc.node_index())?;
+                tx.remove_node(desc.node_index())?;
             };
             tx.commit();
         }

@@ -330,7 +330,7 @@ impl<'a> Transaction<'a> {
         parent_dir.remove_entry(name)?;
         self.write_directory(parent, &parent_dir)?;
 
-        self.delete_node(node_index)
+        self.remove_node(node_index)
     }
 
     /// Creates a hard link to the file with a given name.
@@ -374,7 +374,7 @@ impl<'a> Transaction<'a> {
         node.link_count -= 1;
 
         if node.link_count == 0 && free {
-            self.delete_node(node_index)?;
+            self.remove_node(node_index)?;
         } else {
             self.write_node(node_index, node)?;
         }
@@ -382,8 +382,8 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
-    /// Deletes the node, deallocating its physical blocks.
-    pub fn delete_node(&mut self, node_index: usize) -> Result<()> {
+    /// Removes the node, deallocating its physical blocks.
+    pub fn remove_node(&mut self, node_index: usize) -> Result<()> {
         let node = self.read_node(node_index)?;
         let extents = node.get_extents().iter().take_while(|e| !e.is_null());
         for extent in extents {
