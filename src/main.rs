@@ -48,20 +48,41 @@ fn main() {
                 Err(e) => println!("Error: {:?}", e),
             },
             "create" => {
-                if let Some(name) = args.get(0) {
-                    println!("{:?}", kernel.create(name));
+                if let Some(path) = args.get(0) {
+                    println!("{:?}", kernel.create(path));
                 } else {
-                    println!("Usage: create <name>");
+                    println!("Usage: create <path>");
+                }
+            }
+            "mkdir" => {
+                if let Some(path) = args.get(0) {
+                    println!("{:?}", kernel.mkdir(path));
+                } else {
+                    println!("Usage: mkdir <path>");
+                }
+            }
+            "rmdir" => {
+                if let Some(path) = args.get(0) {
+                    println!("{:?}", kernel.rmdir(path));
+                } else {
+                    println!("Usage: rmdir <path>");
+                }
+            }
+            "cd" => {
+                if let Some(path) = args.get(0) {
+                    println!("{:?}", kernel.cd(path));
+                } else {
+                    println!("Usage: cd <path>");
                 }
             }
             "open" => {
-                if let Some(name) = args.get(0) {
-                    match kernel.open(name) {
+                if let Some(path) = args.get(0) {
+                    match kernel.open(path) {
                         Ok(fd) => println!("File opened.\nfd: {}", fd),
                         Err(e) => println!("Error: {:?}", e),
                     }
                 } else {
-                    println!("Usage: open <name>");
+                    println!("Usage: open <path>");
                 }
             }
             "close" => {
@@ -115,30 +136,30 @@ fn main() {
                 if args.len() >= 2 {
                     println!("{:?}", kernel.link(args[0], args[1]));
                 } else {
-                    println!("Usage: link <old_name> <new_name>");
+                    println!("Usage: link <old_path> <new_path>");
                 }
             }
             "unlink" => {
-                if let Some(name) = args.get(0) {
-                    println!("{:?}", kernel.unlink(name));
+                if let Some(path) = args.get(0) {
+                    println!("{:?}", kernel.unlink(path));
                 } else {
-                    println!("Usage: unlink <name>");
+                    println!("Usage: unlink <path>");
                 }
             }
             "truncate" => {
                 if args.len() >= 2 {
-                    let name = args[0];
+                    let path = args[0];
                     let size = args[1].parse().unwrap_or(0);
-                    println!("{:?}", kernel.truncate(name, size));
+                    println!("{:?}", kernel.truncate(path, size));
                 } else {
-                    println!("Usage: truncate <name> <size>");
+                    println!("Usage: truncate <path> <size>");
                 }
             }
             "stat" => {
-                if let Some(name) = args.get(0) {
-                    match kernel.stat(name) {
+                if let Some(path) = args.get(0) {
+                    match kernel.stat(path) {
                         Ok(stats) => {
-                            println!("File: {}", name);
+                            println!("File: {}", path);
                             println!("Type: {:?}", stats.filetype);
                             println!("Size: {}", stats.size);
                             println!("Links: {}", stats.link_count);
@@ -148,17 +169,20 @@ fn main() {
                         Err(e) => println!("Error: {:?}", e),
                     }
                 } else {
-                    println!("Usage: stat <name>");
+                    println!("Usage: stat <path>");
                 }
             }
-            "ls" => match kernel.ls() {
-                Ok(list) => {
-                    for (name, node) in list {
-                        println!("{} {}", node, name);
+            "ls" => {
+                let path = args.get(0).copied().unwrap_or(".");
+                match kernel.ls(path) {
+                    Ok(list) => {
+                        for (name, node) in list {
+                            println!("{} {}", node, name);
+                        }
                     }
+                    Err(e) => println!("Error: {:?}", e),
                 }
-                Err(e) => println!("Error: {:?}", e),
-            },
+            }
             "clear" => {
                 print!("\x1b[2J\x1b[1;1H");
             }
@@ -168,17 +192,20 @@ fn main() {
                 let commands = [
                     ("mkfs <nodes>", "format filesystem"),
                     ("mount", "mount filesystem"),
-                    ("create <name>", "create a file"),
-                    ("open <name>", "open file"),
+                    ("create <path>", "create a file"),
+                    ("mkdir <path>", "create a directory"),
+                    ("rmdir <path>", "remove a directory"),
+                    ("cd <path>", "change current directory"),
+                    ("open <path>", "open file"),
                     ("close <fd>", "close file"),
                     ("read <fd> <size>", "read bytes from file"),
                     ("write <fd> <string>", "write string to file"),
                     ("seek <fd> <offset>", "seek to offset"),
                     ("link <old> <new>", "create hard link"),
-                    ("unlink <name>", "remove file/link"),
-                    ("truncate <name> <size>", "resize file"),
-                    ("stat <name>", "display file stats"),
-                    ("ls", "list \"/\" directory"),
+                    ("unlink <path>", "remove file/link"),
+                    ("truncate <path> <size>", "resize file"),
+                    ("stat <path>", "display file stats"),
+                    ("ls [path]", "list directory"),
                     ("clear", "clear the screen"),
                     ("exit", "exit the shell"),
                 ];

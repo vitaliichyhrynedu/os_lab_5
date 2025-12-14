@@ -49,7 +49,7 @@ impl Dir {
 
     /// Checks if the directory is empty (contains only `.` and `..` entries).
     pub fn is_empty(&self) -> bool {
-        self.entries.len() == 2
+        self.entries.iter().filter(|e| !e.is_null()).count() == 2
     }
 
     /// Returns a view of the directory as a slice of [DirEntry].

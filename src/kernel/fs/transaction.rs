@@ -266,7 +266,7 @@ impl<'a> Transaction<'a> {
     ) -> Result<usize> {
         let name = DirEntryName::try_from(name).map_err(Error::Dir)?;
 
-        let (mut node, node_index) = self.create_node(FileType::File)?;
+        let (mut node, node_index) = self.create_node(filetype)?;
         node.link_count += 1;
 
         let entry = DirEntry::new(node_index, filetype, name);
