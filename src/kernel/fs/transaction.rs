@@ -337,19 +337,22 @@ impl<'a> Transaction<'a> {
     pub fn link_file(&mut self, parent_index: usize, node_index: usize, name: &str) -> Result<()> {
         let name = DirEntryName::try_from(name).map_err(Error::Dir)?;
 
+        let mut dir = self.read_directory(parent_index)?;
+        if dir.get_entry(name).is_some() {
+            return Err(Error::FileExists);
+        }
+
         let mut node = self.read_node(node_index)?;
         if node.filetype() == FileType::Dir {
             return Err(Error::IsDir);
         }
 
-        node.link_count += 1;
-        self.write_node(node_index, node)?;
-
-        let mut dir = self.read_directory(parent_index)?;
         let entry = DirEntry::new(node_index, node.filetype(), name);
         dir.add_entry(entry);
-        self.write_directory(parent_index, &dir)?;
+        node.link_count += 1;
 
+        self.write_node(node_index, node)?;
+        self.write_directory(parent_index, &dir)?;
         Ok(())
     }
 
